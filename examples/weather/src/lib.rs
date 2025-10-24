@@ -28,6 +28,7 @@ pub struct FetchResult {
 }
 
 #[ext_contract(http_fetcher)]
+#[allow(dead_code)]
 trait HttpFetcher {
     fn fetch(&mut self, url: String, context: Option<Vec<u8>>) -> FetchResult;
 }
@@ -74,32 +75,32 @@ impl Contract {
         &mut self,
         city: String,
         #[callback_result] result: Result<FetchResult, PromiseError>,
-    ) -> bool {
+    ) -> Option<String> {
         match result {
             Ok(fetch_result) => match fetch_result.status {
                 FetchStatus::Completed => {
                     if let Some(body) = fetch_result.body {
                         if let Some(message) = format_weather_message(&body) {
                             env::log_str(&message);
-                            self.weather_by_city.insert(city.clone(), message);
-                            true
+                            self.weather_by_city.insert(city.clone(), message.clone());
+                            Some(message)
                         } else {
                             env::log_str("Failed to parse weather payload");
-                            false
+                            None
                         }
                     } else {
                         env::log_str("Fetch completed without body");
-                        false
+                        None
                     }
                 }
                 FetchStatus::TimedOut => {
                     env::log_str("Fetch timed out");
-                    false
+                    None
                 }
             },
             Err(_) => {
                 env::log_str("Fetch promise failed");
-                false
+                None
             }
         }
     }
@@ -146,7 +147,7 @@ fn format_weather_message(body: &[u8]) -> Option<String> {
     };
 
     if let Some(temp) = temperature_c {
-        message.push_str(&format!(" is {:.1}°C", temp));
+        message.push_str(&format!(" is {:.1}C", temp));
     }
 
     if let Some(desc) = description {

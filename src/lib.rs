@@ -137,7 +137,7 @@ impl Contract {
                 "caller": caller,
             }]
         });
-        env::log_str(&format!("EVENT_JSON:{}", event.to_string()));
+        env::log_str(&format!("EVENT_JSON:{}", event));
 
         env::promise_return(promise_id);
     }
