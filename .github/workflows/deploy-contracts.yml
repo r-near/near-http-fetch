@@ -26,73 +26,70 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          target: wasm32-unknown-unknown
+      - name: Install near CLI
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/near-cli-rs/releases/download/v0.20.0/near-cli-rs-installer.sh | sh
 
-      - name: Install cargo-near
-        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/latest/download/cargo-near-installer.sh | sh
+      - name: Install cargo-near CLI
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.17.0/cargo-near-installer.sh | sh
 
-      - name: Install near-cli
-        run: npm install -g near-cli
-
-      - name: Setup NEAR credentials
-        run: |
-          mkdir -p ~/.near-credentials/testnet
-          echo '${{ secrets.NEAR_CREDENTIALS_FETCHER }}' > ~/.near-credentials/testnet/http-fetcher.testnet.json
-          echo '${{ secrets.NEAR_CREDENTIALS_WEATHER }}' > ~/.near-credentials/testnet/weather-example.testnet.json
-
-      - name: Build HTTP Fetcher contract
+      - name: Extract private key from fetcher credentials
         if: github.event_name == 'push' || github.event.inputs.deploy_fetcher == 'true'
+        id: fetcher_key
         run: |
-          cargo near build non-reproducible-wasm
-          echo "Built HTTP Fetcher contract"
-          ls -lh target/near/
+          PRIVATE_KEY=$(echo '${{ secrets.NEAR_CREDENTIALS_FETCHER }}' | jq -r '.private_key')
+          echo "::add-mask::$PRIVATE_KEY"
+          echo "key=$PRIVATE_KEY" >> $GITHUB_OUTPUT
+
+      - name: Extract private key from weather credentials
+        if: github.event_name == 'push' || github.event.inputs.deploy_weather == 'true'
+        id: weather_key
+        run: |
+          PRIVATE_KEY=$(echo '${{ secrets.NEAR_CREDENTIALS_WEATHER }}' | jq -r '.private_key')
+          echo "::add-mask::$PRIVATE_KEY"
+          echo "key=$PRIVATE_KEY" >> $GITHUB_OUTPUT
 
       - name: Deploy HTTP Fetcher contract
         if: github.event_name == 'push' || github.event.inputs.deploy_fetcher == 'true'
         run: |
-          near deploy \
-            --accountId http-fetcher.testnet \
-            --wasmFile target/near/http_fetch.wasm \
-            --networkId testnet
+          cargo near deploy build-reproducible-wasm --skip-git-remote-check http-fetcher.testnet \
+            without-init-call \
+            network-config testnet \
+            sign-with-plaintext-private-key "${{ steps.fetcher_key.outputs.key }}" \
+            send
           echo "Deployed HTTP Fetcher to http-fetcher.testnet"
 
       - name: Initialize HTTP Fetcher contract
         if: github.event_name == 'push' || github.event.inputs.deploy_fetcher == 'true'
         run: |
-          near call http-fetcher.testnet new \
-            '{"trusted_relayer": "http-relayer.testnet"}' \
-            --accountId http-fetcher.testnet \
-            --networkId testnet || echo "Contract already initialized or init failed - continuing"
-
-      - name: Build Weather contract
-        if: github.event_name == 'push' || github.event.inputs.deploy_weather == 'true'
-        run: |
-          cd examples/weather
-          cargo near build non-reproducible-wasm
-          echo "Built Weather contract"
-          ls -lh target/near/
+          near contract call-function as-transaction http-fetcher.testnet new json-args '{"trusted_relayer": "http-relayer.testnet"}' \
+            prepaid-gas '100.0 Tgas' \
+            attached-deposit '0 NEAR' \
+            sign-as http-fetcher.testnet \
+            network-config testnet \
+            sign-with-plaintext-private-key "${{ steps.fetcher_key.outputs.key }}" \
+            send || echo "Contract already initialized or init failed - continuing"
 
       - name: Deploy Weather contract
         if: github.event_name == 'push' || github.event.inputs.deploy_weather == 'true'
+        working-directory: examples/weather
         run: |
-          near deploy \
-            --accountId weather-example.testnet \
-            --wasmFile examples/weather/target/near/weather.wasm \
-            --networkId testnet
+          cargo near deploy build-reproducible-wasm --skip-git-remote-check weather-example.testnet \
+            without-init-call \
+            network-config testnet \
+            sign-with-plaintext-private-key "${{ steps.weather_key.outputs.key }}" \
+            send
           echo "Deployed Weather to weather-example.testnet"
 
       - name: Initialize Weather contract
         if: github.event_name == 'push' || github.event.inputs.deploy_weather == 'true'
         run: |
-          near call weather-example.testnet new \
-            '{"fetcher_account": "http-fetcher.testnet"}' \
-            --accountId weather-example.testnet \
-            --networkId testnet || echo "Contract already initialized or init failed - continuing"
+          near contract call-function as-transaction weather-example.testnet new json-args '{"fetcher_account": "http-fetcher.testnet"}' \
+            prepaid-gas '100.0 Tgas' \
+            attached-deposit '0 NEAR' \
+            sign-as weather-example.testnet \
+            network-config testnet \
+            sign-with-plaintext-private-key "${{ steps.weather_key.outputs.key }}" \
+            send || echo "Contract already initialized or init failed - continuing"
 
       - name: Upload HTTP Fetcher WASM artifact
         if: github.event_name == 'push' || github.event.inputs.deploy_fetcher == 'true'
