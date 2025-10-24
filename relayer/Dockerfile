@@ -1,5 +1,5 @@
 # Build stage
-FROM rust:1.83 AS builder
+FROM rust:1.86 AS builder
 
 WORKDIR /usr/src/relayer
 

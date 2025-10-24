@@ -1,0 +1,128 @@
+name: Deploy Contracts to Testnet
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_fetcher:
+        description: 'Deploy HTTP Fetcher contract'
+        type: boolean
+        default: true
+      deploy_weather:
+        description: 'Deploy Weather contract'
+        type: boolean
+        default: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      - name: Install cargo-near
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/latest/download/cargo-near-installer.sh | sh
+
+      - name: Install near-cli
+        run: npm install -g near-cli
+
+      - name: Setup NEAR credentials
+        run: |
+          mkdir -p ~/.near-credentials/testnet
+          echo '${{ secrets.NEAR_CREDENTIALS_FETCHER }}' > ~/.near-credentials/testnet/http-fetcher.testnet.json
+          echo '${{ secrets.NEAR_CREDENTIALS_WEATHER }}' > ~/.near-credentials/testnet/weather-example.testnet.json
+
+      - name: Build HTTP Fetcher contract
+        if: github.event_name == 'push' || github.event.inputs.deploy_fetcher == 'true'
+        run: |
+          cargo near build --release
+          echo "Built HTTP Fetcher contract"
+          ls -lh target/near/
+
+      - name: Deploy HTTP Fetcher contract
+        if: github.event_name == 'push' || github.event.inputs.deploy_fetcher == 'true'
+        run: |
+          near deploy \
+            --accountId http-fetcher.testnet \
+            --wasmFile target/near/http_fetch.wasm \
+            --networkId testnet
+          echo "Deployed HTTP Fetcher to http-fetcher.testnet"
+
+      - name: Initialize HTTP Fetcher contract
+        if: github.event_name == 'push' || github.event.inputs.deploy_fetcher == 'true'
+        run: |
+          near call http-fetcher.testnet new \
+            '{"trusted_relayer": "http-relayer.testnet"}' \
+            --accountId http-fetcher.testnet \
+            --networkId testnet || echo "Contract already initialized or init failed - continuing"
+
+      - name: Build Weather contract
+        if: github.event_name == 'push' || github.event.inputs.deploy_weather == 'true'
+        run: |
+          cd examples/weather
+          cargo near build --release
+          echo "Built Weather contract"
+          ls -lh target/near/
+
+      - name: Deploy Weather contract
+        if: github.event_name == 'push' || github.event.inputs.deploy_weather == 'true'
+        run: |
+          near deploy \
+            --accountId weather-example.testnet \
+            --wasmFile examples/weather/target/near/weather.wasm \
+            --networkId testnet
+          echo "Deployed Weather to weather-example.testnet"
+
+      - name: Initialize Weather contract
+        if: github.event_name == 'push' || github.event.inputs.deploy_weather == 'true'
+        run: |
+          near call weather-example.testnet new \
+            '{"fetcher_account": "http-fetcher.testnet"}' \
+            --accountId weather-example.testnet \
+            --networkId testnet || echo "Contract already initialized or init failed - continuing"
+
+      - name: Upload HTTP Fetcher WASM artifact
+        if: github.event_name == 'push' || github.event.inputs.deploy_fetcher == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: http-fetch-contract
+          path: target/near/http_fetch.wasm
+          retention-days: 30
+
+      - name: Upload Weather WASM artifact
+        if: github.event_name == 'push' || github.event.inputs.deploy_weather == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-contract
+          path: examples/weather/target/near/weather.wasm
+          retention-days: 30
+
+      - name: Deployment Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### HTTP Fetcher Contract" >> $GITHUB_STEP_SUMMARY
+          echo "- **Account**: \`http-fetcher.testnet\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Network**: testnet" >> $GITHUB_STEP_SUMMARY
+          echo "- **Explorer**: https://testnet.nearblocks.io/address/http-fetcher.testnet" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Weather Contract" >> $GITHUB_STEP_SUMMARY
+          echo "- **Account**: \`weather-example.testnet\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Network**: testnet" >> $GITHUB_STEP_SUMMARY
+          echo "- **Explorer**: https://testnet.nearblocks.io/address/weather-example.testnet" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Relayer" >> $GITHUB_STEP_SUMMARY
+          echo "- **Account**: \`http-relayer.testnet\`" >> $GITHUB_STEP_SUMMARY
