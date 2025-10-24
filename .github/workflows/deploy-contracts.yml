@@ -51,7 +51,7 @@ jobs:
       - name: Deploy HTTP Fetcher contract
         if: github.event_name == 'push' || github.event.inputs.deploy_fetcher == 'true'
         run: |
-          cargo near deploy non-reproducible-wasm http-fetcher.testnet \
+          cargo near deploy build-non-reproducible-wasm http-fetcher.testnet \
             without-init-call \
             network-config testnet \
             sign-with-plaintext-private-key "${{ steps.fetcher_key.outputs.key }}" \
@@ -73,7 +73,7 @@ jobs:
         if: github.event_name == 'push' || github.event.inputs.deploy_weather == 'true'
         working-directory: examples/weather
         run: |
-          cargo near deploy non-reproducible-wasm weather-example.testnet \
+          cargo near deploy build-non-reproducible-wasm weather-example.testnet \
             without-init-call \
             network-config testnet \
             sign-with-plaintext-private-key "${{ steps.weather_key.outputs.key }}" \
