@@ -1,0 +1,21 @@
+[package]
+name = "weather"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+borsh = "1.5"
+near-sdk = "5.16"
+serde = { version = "1", features = ["derive"] }
+urlencoding = "2"
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true

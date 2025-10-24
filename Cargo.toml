@@ -11,39 +11,21 @@ repository = "https://github.com/<xxx>/<xxx>"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-# fields to configure build with WASM reproducibility, according to specs
-# in https://github.com/near/NEPs/blob/master/neps/nep-0330.md
-[package.metadata.near.reproducible_build]
-# docker image, descriptor of build environment
-image = "sourcescan/cargo-near:0.16.2-rust-1.86.0"
-# tag after colon above serves only descriptive purpose; image is identified by digest
-image_digest = "sha256:74c24d4d912f893198b8b13e01d43e0f78f3b00b3df45bf555a707eb4918a54e"
-# list of environment variables names, whose values, if set, will be used as external build parameters
-# in a reproducible manner
-# supported by `sourcescan/cargo-near:0.10.1-rust-1.82.0` image or later images
-passed_env = []
-# build command inside of docker container
-# if docker image from default gallery is used https://hub.docker.com/r/sourcescan/cargo-near/tags,
-# the command may be any combination of flags of `cargo-near`,
-# supported by respective version of binary inside the container besides `--no-locked` flag
-container_build_command = [
-    "cargo",
-    "near",
-    "build",
-    "non-reproducible-wasm",
-    "--locked",
-]
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
+borsh = "1.5"
 near-sdk = "5.16"
 
 [dev-dependencies]
+anyhow = "1"
+base64 = "0.22"
 near-sdk = { version = "5.16", features = ["unit-testing"] }
+near-sandbox = "0.2"
 near-workspaces = { version = "0.21", features = ["unstable"] }
-tokio = { version = "1.12.0", features = ["full"] }
+relayer = { path = "relayer" }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-
+tokio = { version = "1.12.0", features = ["full"] }
 [profile.release]
 codegen-units = 1
 # Tell `rustc` to optimize for small code size.
