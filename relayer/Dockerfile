@@ -3,11 +3,19 @@ FROM rust:1.86 AS builder
 
 WORKDIR /usr/src/relayer
 
-# Copy the relayer source
+# Copy only Cargo files first to cache dependencies
 COPY relayer/Cargo.toml relayer/Cargo.lock ./
+
+# Create a dummy main.rs to build dependencies
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs && \
+    cargo build --release && \
+    rm -rf src
+
+# Now copy the actual source code
 COPY relayer/src ./src
 
-# Build the relayer in release mode
+# Build the relayer with dependencies cached
 RUN cargo build --release
 
 # Runtime stage
