@@ -48,7 +48,7 @@ jobs:
       - name: Build HTTP Fetcher contract
         if: github.event_name == 'push' || github.event.inputs.deploy_fetcher == 'true'
         run: |
-          cargo near build --release
+          cargo near build non-reproducible-wasm
           echo "Built HTTP Fetcher contract"
           ls -lh target/near/
 
@@ -73,7 +73,7 @@ jobs:
         if: github.event_name == 'push' || github.event.inputs.deploy_weather == 'true'
         run: |
           cd examples/weather
-          cargo near build --release
+          cargo near build non-reproducible-wasm
           echo "Built Weather contract"
           ls -lh target/near/
 
