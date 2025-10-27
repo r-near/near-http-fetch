@@ -96,7 +96,7 @@ http-fetch/
   ```
 - **NEAR CLI**: For deploying and interacting with contracts
   ```bash
-  npm install -g near-cli
+  npm install -g near-cli-rs@latest
   ```
 
 ### Building the Contracts
@@ -108,10 +108,12 @@ cargo near build
 ```
 
 The output appears in `target/near/`:
+
 - `http_fetch.wasm` - The main fetcher contract
 - `weather.wasm` - The weather example contract
 
 Build specific contracts:
+
 ```bash
 cargo near build -p weather
 ```
@@ -125,6 +127,7 @@ cargo test -- --nocapture
 ```
 
 Key tests:
+
 - `fetcher_yield_resume_flow` - Tests basic yield/resume mechanism
 - `weather_contract_flow` - Full integration test with the weather example
 
@@ -136,11 +139,10 @@ Note: The weather test makes real HTTP calls to OpenWeather API, so network acce
 
 ```bash
 # Create a new account for the fetcher
-near create-account fetcher.your-account.testnet \
-  --masterAccount your-account.testnet
+near create-account fetcher.your-account.testnet
 
 # Deploy the contract
-cargo near deploy fetcher.your-account.testnet \
+near deploy fetcher.your-account.testnet \
   --wasmFile target/near/http_fetch.wasm
 
 # Initialize with your relayer account
@@ -157,7 +159,7 @@ near create-account weather.your-account.testnet \
   --masterAccount your-account.testnet
 
 # Deploy
-cargo near deploy weather.your-account.testnet \
+near deploy weather.your-account.testnet \
   --wasmFile target/near/weather.wasm
 
 # Initialize with fetcher account
@@ -192,6 +194,7 @@ cargo run
 ```
 
 The relayer will:
+
 1. Poll the fetcher contract every `POLL_INTERVAL_SECS` seconds
 2. Execute HTTP GET requests for pending items
 3. Upload large responses in chunks via `store_response_chunk()`
@@ -271,18 +274,23 @@ impl MyContract {
 ### Fetcher Contract Methods
 
 #### `new(trusted_relayer: AccountId)`
+
 Initialize the contract with the relayer account that's authorized to fulfill requests.
 
 #### `fetch(url: String, context: Option<Vec<u8>>)`
+
 Request HTTP data from a URL. The `context` parameter is passed through to your callback for request tracking. This function yields and returns a `FetchResult`.
 
 #### `list_requests() -> Vec<PendingRequest>`
+
 Returns all pending fetch requests (used by relayers).
 
 #### `respond(request_id: u64, yield_id: Vec<u8>, body: Option<Vec<u8>>)`
+
 Resume a yielded promise with response data. Only callable by the trusted relayer.
 
 #### `store_response_chunk(request_id: u64, data: Vec<u8>, append: bool)`
+
 Store response data in chunks (for large payloads). Only callable by the trusted relayer.
 
 ### FetchResult Structure
